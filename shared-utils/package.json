@@ -1,0 +1,42 @@
+{
+  "name": "@management-app/shared-utils",
+  "version": "1.0.0",
+  "description": "Shared utilities and common functions for Management App microservices",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "joi": "^17.11.0",
+    "amqplib": "^0.10.3",
+    "winston": "^3.11.0",
+    "moment": "^2.29.4",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "eslint": "^8.55.0"
+  },
+  "keywords": [
+    "shared",
+    "utils",
+    "microservices",
+    "management-app"
+  ],
+  "author": "Management App Team",
+  "license": "MIT",
+  "files": [
+    "index.js",
+    "validators/",
+    "middleware/",
+    "constants/",
+    "helpers/",
+    "rabbitmq/",
+    "logger/"
+  ]
+}

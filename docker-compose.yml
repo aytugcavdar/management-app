@@ -1,0 +1,230 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:6.0
+    container_name: management-app-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: management_app
+    volumes:
+      - mongodb_data:/data/db
+      - ./init-scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - management-network
+
+  # RabbitMQ Message Queue
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: management-app-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"     # AMQP port
+      - "15672:15672"   # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: password123
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - management-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7.0-alpine
+    container_name: management-app-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass password123
+    volumes:
+      - redis_data:/data
+    networks:
+      - management-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: management-app-auth-service
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/management_app?authSource=admin
+      REDIS_URI: redis://:password123@redis:6379
+      RABBITMQ_URI: amqp://admin:password123@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRE: ${JWT_EXPIRE}
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+    networks:
+      - management-network
+    develop:
+      watch:
+        - action: sync
+          path: ./services/auth-service
+          target: /app
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./services/auth-service/package.json
+
+  # Board Service
+  board-service:
+    build:
+      context: ./services/board-service
+      dockerfile: Dockerfile
+    container_name: management-app-board-service
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: development
+      PORT: 3002
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/management_app?authSource=admin
+      REDIS_URI: redis://:password123@redis:6379
+      RABBITMQ_URI: amqp://admin:password123@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+    networks:
+      - management-network
+    develop:
+      watch:
+        - action: sync
+          path: ./services/board-service
+          target: /app
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./services/board-service/package.json
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: management-app-notification-service
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    environment:
+      NODE_ENV: development
+      PORT: 3003
+      RABBITMQ_URI: amqp://admin:password123@rabbitmq:5672
+      EMAIL_HOST: ${EMAIL_HOST}
+      EMAIL_PORT: ${EMAIL_PORT}
+      EMAIL_USER: ${EMAIL_USER}
+      EMAIL_PASS: ${EMAIL_PASS}
+    depends_on:
+      - rabbitmq
+    networks:
+      - management-network
+    develop:
+      watch:
+        - action: sync
+          path: ./services/notification-service
+          target: /app
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./services/notification-service/package.json
+
+  # Realtime Service  
+  realtime-service:
+    build:
+      context: ./services/realtime-service
+      dockerfile: Dockerfile
+    container_name: management-app-realtime-service
+    restart: unless-stopped
+    ports:
+      - "3004:3004"
+    environment:
+      NODE_ENV: development
+      PORT: 3004
+      REDIS_URI: redis://:password123@redis:6379
+      RABBITMQ_URI: amqp://admin:password123@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - redis
+      - rabbitmq
+    networks:
+      - management-network
+    develop:
+      watch:
+        - action: sync
+          path: ./services/realtime-service
+          target: /app
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./services/realtime-service/package.json
+
+  # API Gateway
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: management-app-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      AUTH_SERVICE_URL: http://auth-service:3001
+      BOARD_SERVICE_URL: http://board-service:3002
+      NOTIFICATION_SERVICE_URL: http://notification-service:3003
+      REALTIME_SERVICE_URL: http://realtime-service:3004
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - auth-service
+      - board-service
+      - notification-service
+      - realtime-service
+    networks:
+      - management-network
+    develop:
+      watch:
+        - action: sync
+          path: ./gateway
+          target: /app
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./gateway/package.json
+
+volumes:
+  mongodb_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  management-network:
+    driver: bridge
