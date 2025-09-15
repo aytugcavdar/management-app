@@ -12,18 +12,18 @@ const router = express.Router();
 router.post(
   '/register',
   commonValidators.validateRequestBody(userValidators.registerSchema),
-  errorHandler.asyncHandler(AuthController.register)
+  AuthController.register
 );
 
 router.post(
   '/login',
   commonValidators.validateRequestBody(userValidators.loginSchema),
-  errorHandler.asyncHandler(AuthController.login)
+  AuthController.login
 );
 
 router.get(
   '/verify-email/:token',
-  errorHandler.asyncHandler(AuthController.verifyEmail)
+  AuthController.verifyEmail
 );
 
 router.post(
@@ -31,7 +31,7 @@ router.post(
   commonValidators.validateRequestBody({
     email: require('joi').string().email().required()
   }),
-  errorHandler.asyncHandler(AuthController.resendEmailVerification)
+  AuthController.resendEmailVerification
 );
 
 router.post(
@@ -39,7 +39,7 @@ router.post(
   commonValidators.validateRequestBody({
     email: require('joi').string().email().required()
   }),
-  errorHandler.asyncHandler(AuthController.forgotPassword)
+  AuthController.forgotPassword
 );
 
 router.post(
@@ -49,7 +49,7 @@ router.post(
     confirmPassword: require('joi').string().valid(require('joi').ref('password')).required()
       .messages({ 'any.only': 'Passwords do not match' })
   }),
-  errorHandler.asyncHandler(AuthController.resetPassword)
+  AuthController.resetPassword
 );
 
 // Protected routes (authentication required)
@@ -57,24 +57,24 @@ router.use(authMiddleware.verifyToken);
 
 router.get(
   '/profile',
-  errorHandler.asyncHandler(AuthController.getProfile)
+  AuthController.getProfile
 );
 
 router.put(
   '/profile',
   commonValidators.validateRequestBody(userValidators.updateProfileSchema),
-  errorHandler.asyncHandler(AuthController.updateProfile)
+  AuthController.updateProfile
 );
 
 router.post(
   '/change-password',
   commonValidators.validateRequestBody(userValidators.changePasswordSchema),
-  errorHandler.asyncHandler(AuthController.changePassword)
+  AuthController.changePassword
 );
 
 router.post(
   '/refresh-token',
-  errorHandler.asyncHandler(AuthController.refreshToken)
+  AuthController.refreshToken
 );
 
 module.exports = router;
